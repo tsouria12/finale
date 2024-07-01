@@ -179,7 +179,7 @@ Be sure to read full message before you continue, by clicking "✅ Confirm" butt
     };
     editMessage(chatId, messageId, paymentInformation, opts);
   } else if (data === 'check_payment') {
-bot.sendMessage(chatId, '❗️ Payment Not Received.');
+    bot.sendMessage(chatId, '❗️ Payment Not Received.');
     logger.info('Payment check executed: Payment Not Received.');
   } else if (data === 'cancel_and_start_over') {
     userData[chatId] = { state: STATES.SELECTING_CHAIN, lastMessageId: messageId };
@@ -195,7 +195,7 @@ bot.sendMessage(chatId, '❗️ Payment Not Received.');
     editMessage(chatId, messageId, 'Order cancelled. Starting over.');
     editMessage(chatId, messageId, 'Select chain:', opts);
   } else if (data === 'confirm_delete') {
-    delete userData[chatId];
+    delete userData[chatId]; // Clear user data
     const opts = {
       reply_markup: {
         inline_keyboard: [
@@ -205,7 +205,7 @@ bot.sendMessage(chatId, '❗️ Payment Not Received.');
         ]
       }
     };
-    editMessage(chatId, messageId, 'Select chain:', opts);
+    editMessage(chatId, messageId, 'All configuration data has been deleted. Select chain to start again:', opts);
     logger.info('All configuration data has been deleted.');
   } else if (data === 'cancel_delete') {
     bot.sendMessage(chatId, 'Deletion cancelled.');
@@ -294,5 +294,5 @@ app.get('/', (req, res) => {
 const port = process.env.PORT || 5000;
 app.listen(port, () => {
   logger.info(`Express app listening on port ${port}`);
-  bot.setWebHook(`https://finale-hiha.onrender.com/webhook`);
+  bot.setWebHook(`https://finale-7oi6.onrender.com/webhook`);
 });
