@@ -208,7 +208,7 @@ Be sure to read full message before you continue, by clicking "✅ Confirm" butt
         ]
       }
     };
-    editMessage(chatId, lastMessageId, 'All configuration data has been deleted. Select chain to start again:', opts);
+    editMessage(chatId, lastMessageId, 'Select chain:', opts);
     logger.info('All configuration data has been deleted.');
   } else if (data === 'cancel_delete') {
     bot.sendMessage(chatId, 'Deletion cancelled.');
