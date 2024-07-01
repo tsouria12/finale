@@ -54,7 +54,7 @@ const STATES = {
 let userData = {};
 
 // Function to reset user data and restart the conversation
-const resetAndStart = async (chatId, messageId) => {
+const resetAndStart = async (chatId) => {
   userData[chatId] = { state: STATES.SELECTING_CHAIN };
   const opts = {
     reply_markup: {
@@ -65,21 +65,13 @@ const resetAndStart = async (chatId, messageId) => {
       ]
     }
   };
-  try {
-    await bot.editMessageText('Select chain:', { chat_id: chatId, message_id: messageId, reply_markup: opts.reply_markup });
-  } catch (error) {
-    if (error.response && error.response.body && error.response.body.description === "Bad Request: message can't be edited") {
-      await bot.sendMessage(chatId, 'Select chain:', opts);
-    } else {
-      throw error;
-    }
-  }
+  await bot.sendMessage(chatId, 'Select chain:', opts);
 };
 
 // Start command
 bot.onText(/\/start/, (msg) => {
   const chatId = msg.chat.id;
-  resetAndStart(chatId, msg.message_id);
+  resetAndStart(chatId);
   logger.info("Received /start command");
 });
 
@@ -95,16 +87,18 @@ bot.on('callback_query', async (callbackQuery) => {
   }
 
   try {
+    await bot.deleteMessage(chatId, messageId);
+
     if (userData[chatId].state === STATES.SELECTING_CHAIN) {
       userData[chatId].chain = data;
       userData[chatId].state = STATES.TYPING_TOKEN;
-      await bot.editMessageText('Send me token address.', { chat_id: chatId, message_id: messageId });
+      await bot.sendMessage(chatId, 'Send me token address.');
       logger.info(`Chain selected: ${data}`);
     } else if (userData[chatId].state === STATES.SELECTING_SLOT) {
       if (data === 'Fast-Track') {
         userData[chatId].order = data;
         userData[chatId].state = STATES.TYPING_PORTAL;
-        await bot.editMessageText('❔ Send me portal/group link.', { chat_id: chatId, message_id: messageId });
+        await bot.sendMessage(chatId, '❔ Send me portal/group link.');
         logger.info(`Order selected: ${data}`);
       } else {
         userData[chatId].slot = data;
@@ -119,7 +113,7 @@ bot.on('callback_query', async (callbackQuery) => {
             ]
           }
         };
-        await bot.editMessageText('❔ Select period:', { chat_id: chatId, message_id: messageId, reply_markup: opts.reply_markup });
+        await bot.sendMessage(chatId, '❔ Select period:', opts);
         logger.info(`Slot selected: ${data}`);
       }
     } else if (userData[chatId].state === STATES.SELECTING_PERIOD) {
@@ -158,7 +152,7 @@ Be sure to read full message before you continue, by clicking "✅ Confirm" butt
         },
         parse_mode: 'HTML'
       };
-      await bot.editMessageText(confirmationMessage, { chat_id: chatId, message_id: messageId, reply_markup: opts.reply_markup });
+      await bot.sendMessage(chatId, confirmationMessage, opts);
       logger.info(`Period selected: ${data}`);
     } else if (data === 'confirm_order') {
       const { token_address, chain, portal_link, slot, period } = userData[chatId];
@@ -184,32 +178,29 @@ Be sure to read full message before you continue, by clicking "✅ Confirm" butt
         },
         parse_mode: 'HTML'
       };
-      await bot.editMessageText(paymentInformation, { chat_id: chatId, message_id: messageId, reply_markup: opts.reply_markup });
+      await bot.sendMessage(chatId, paymentInformation, opts);
     } else if (data === 'check_payment') {
       await bot.sendMessage(chatId, '❗️ Payment Not Received.');
       logger.info('Payment check executed: Payment Not Received.');
     } else if (data === 'cancel_and_start_over') {
-      await resetAndStart(chatId, messageId);
+      await resetAndStart(chatId);
     } else if (data === 'confirm_delete') {
       userData[chatId] = {};
       logger.info('All configuration data has been deleted.');
-      await resetAndStart(chatId, messageId);
+      await resetAndStart(chatId);
     } else if (data === 'cancel_delete') {
-      await bot.editMessageText('Deletion cancelled.', { chat_id: chatId, message_id: messageId });
+      await bot.sendMessage(chatId, 'Deletion cancelled.');
       logger.info('Deletion cancelled.');
     }
   } catch (error) {
-    if (error.response && error.response.body && error.response.body.description === "Bad Request: message can't be edited") {
-      await bot.sendMessage(chatId, 'An error occurred, please try again.');
-    } else {
-      throw error;
-    }
+    logger.error(`Error: ${error.message}`);
   }
 });
 
 // Token address handler
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
+  const messageId = msg.message_id;
   const text = msg.text;
 
   // Ensure the message is not from the bot itself
@@ -221,6 +212,8 @@ bot.on('message', async (msg) => {
   }
 
   try {
+    await bot.deleteMessage(chatId, messageId);
+
     if (userData[chatId].state === STATES.TYPING_TOKEN) {
       userData[chatId].token_address = text;
       userData[chatId].state = STATES.SELECTING_SLOT;
@@ -231,7 +224,7 @@ bot.on('message', async (msg) => {
           ]
         }
       };
-      await bot.editMessageText('What do you want to order?', { chat_id: chatId, message_id: msg.message_id, reply_markup: opts.reply_markup });
+      await bot.sendMessage(chatId, 'What do you want to order?', opts);
       logger.info(`Token address received: ${text}`);
     } else if (userData[chatId].state === STATES.TYPING_PORTAL) {
       const telegramLinkPattern = /(https?:\/\/)?(www\.)?(t\.me|telegram\.me)\/[a-zA-Z0-9_]+/;
@@ -247,20 +240,16 @@ bot.on('message', async (msg) => {
             ]
           }
         };
-        await bot.editMessageText('ℹ Select open slot or click to see the nearest potential availability time:', { chat_id: chatId, message_id: msg.message_id, reply_markup: opts.reply_markup });
+        await bot.sendMessage(chatId, 'ℹ Select open slot or click to see the nearest potential availability time:', opts);
         logger.info(`Portal link received: ${text}`);
       } else {
-        await bot.editMessageText('❗️ Incorrect portal or group link. Please send a correct Telegram group link.', { chat_id: chatId, message_id: msg.message_id });
+        await bot.sendMessage(chatId, '❗️ Incorrect portal or group link. Please send a correct Telegram group link.');
         logger.warning('Incorrect portal or group link received');
         // Keep the state to TYPING_PORTAL so that the user can re-enter the link
       }
     }
   } catch (error) {
-    if (error.response && error.response.body && error.response.body.description === "Bad Request: message can't be edited") {
-      await bot.sendMessage(chatId, 'An error occurred, please try again.');
-    } else {
-      throw error;
-    }
+    logger.error(`Error: ${error.message}`);
   }
 });
 
@@ -297,7 +286,6 @@ app.post('/webhook', (req, res) => {
 
 app.get('/', (req, res) => {
   res.send('Hello World!');
-
 });
 
 const port = process.env.PORT || 5000;
