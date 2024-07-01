@@ -86,7 +86,9 @@ bot.on('callback_query', (callbackQuery) => {
   const messageId = callbackQuery.message.message_id;
   const data = callbackQuery.data;
 
-  if (!userData[chatId]) return;
+  if (!userData[chatId]) {
+    userData[chatId] = { state: STATES.SELECTING_CHAIN };
+  }
 
   if (userData[chatId].state === STATES.SELECTING_CHAIN) {
     userData[chatId].chain = data;
@@ -182,7 +184,7 @@ Be sure to read full message before you continue, by clicking "✅ Confirm" butt
     bot.sendMessage(chatId, '❗️ Payment Not Received.');
     logger.info('Payment check executed: Payment Not Received.');
   } else if (data === 'cancel_and_start_over') {
-    userData[chatId] = { state: STATES.SELECTING_CHAIN, lastMessageId: messageId };
+    userData[chatId] = { state: STATES.SELECTING_CHAIN };
     const opts = {
       reply_markup: {
         inline_keyboard: [
@@ -192,8 +194,8 @@ Be sure to read full message before you continue, by clicking "✅ Confirm" butt
         ]
       }
     };
-    editMessage(chatId, messageId, 'Order cancelled. Starting over.');
-    editMessage(chatId, messageId, 'Select chain:', opts);
+    editMessage(chatId, messageId, 'Order cancelled. Starting over.', opts);
+    logger.info('Order cancelled and starting over.');
   } else if (data === 'confirm_delete') {
     delete userData[chatId]; // Clear user data
     const opts = {
@@ -205,7 +207,7 @@ Be sure to read full message before you continue, by clicking "✅ Confirm" butt
         ]
       }
     };
-    editMessage(chatId, messageId, 'All configuration data has been deleted. Select chain to start again:', opts);
+    bot.sendMessage(chatId, 'All configuration data has been deleted. Select chain to start again:', opts);
     logger.info('All configuration data has been deleted.');
   } else if (data === 'cancel_delete') {
     bot.sendMessage(chatId, 'Deletion cancelled.');
@@ -294,5 +296,5 @@ app.get('/', (req, res) => {
 const port = process.env.PORT || 5000;
 app.listen(port, () => {
   logger.info(`Express app listening on port ${port}`);
-  bot.setWebHook(`https://finale-7oi6.onrender.com/webhook`);
+  bot.setWebHook(`https://finale-hiha.onrender.com/webhook`);
 });
