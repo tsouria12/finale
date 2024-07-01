@@ -184,7 +184,10 @@ Be sure to read full message before you continue, by clicking "✅ Confirm" butt
   } else if (data === 'confirm_delete') {
     userData = {};
     logger.info('All configuration data has been deleted.');
-    bot.sendMessage(chatId, 'All configuration data has been deleted.');
+    bot.sendMessage(chatId, 'All configuration data has been deleted. Restarting bot...');
+    setTimeout(() => {
+      process.exit(0); // Exit the process to trigger a restart
+    }, 1000); // Delay to ensure the message is sent before the process exits
   } else if (data === 'cancel_delete') {
     bot.sendMessage(chatId, 'Deletion cancelled.');
     logger.info('Deletion cancelled.');
