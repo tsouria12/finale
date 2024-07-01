@@ -1,8 +1,6 @@
 const TelegramBot = require('node-telegram-bot-api');
 const express = require('express');
 const bodyParser = require('body-parser');
-const fs = require('fs');
-const path = require('path');
 
 // Enable logging
 const log4js = require('log4js');
@@ -65,34 +63,20 @@ const resetAndStart = async (chatId) => {
       ]
     }
   };
-  await bot.sendMessage(chatId, 'Select chain:', opts);
+  const sentMessage = await bot.sendMessage(chatId, 'Select chain:', opts);
+  userData[chatId].messageId = sentMessage.message_id;
 };
 
 // Start command
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
-  
-  // Clear previous messages if they exist
-  if (userData[chatId] && userData[chatId].messageId) {
-    try {
-      await bot.deleteMessage(chatId, userData[chatId].messageId);
-    } catch (error) {
-      logger.error(`Error deleting previous message: ${error.message}`);
-    }
-  }
 
-  const sentMessage = await bot.sendMessage(chatId, 'Select chain:', {
-    reply_markup: {
-      inline_keyboard: [
-        [{ text: 'ETH', callback_data: 'ETH' }],
-        [{ text: 'BNB', callback_data: 'BNB' }],
-        [{ text: 'SOL', callback_data: 'SOL' }]
-      ]
-    }
-  });
-  
-  userData[chatId] = { state: STATES.SELECTING_CHAIN, messageId: sentMessage.message_id };
-  logger.info("Received /start command");
+  if (userData[chatId] && userData[chatId].state) {
+    await bot.sendMessage(chatId, '❗️ Firstly, you need to delete current configuration using /delete!');
+  } else {
+    await resetAndStart(chatId);
+    logger.info("Received /start command");
+  }
 });
 
 // Callback query handler
