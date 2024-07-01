@@ -54,7 +54,7 @@ const STATES = {
 let userData = {};
 
 // Function to reset user data and restart the conversation
-const resetAndStart = async (chatId, messageId) => {
+const resetAndStart = async (chatId) => {
   userData[chatId] = { state: STATES.SELECTING_CHAIN };
   const opts = {
     reply_markup: {
@@ -65,20 +65,19 @@ const resetAndStart = async (chatId, messageId) => {
       ]
     }
   };
-  await bot.editMessageText('Select chain:', { chat_id: chatId, message_id: messageId, reply_markup: opts.reply_markup });
+  await bot.sendMessage(chatId, 'Select chain:', opts);
 };
 
 // Start command
 bot.onText(/\/start/, (msg) => {
   const chatId = msg.chat.id;
-  resetAndStart(chatId, msg.message_id);
+  resetAndStart(chatId);
   logger.info("Received /start command");
 });
 
 // Callback query handler
 bot.on('callback_query', async (callbackQuery) => {
   const chatId = callbackQuery.message.chat.id;
-  const messageId = callbackQuery.message.message_id;
   const data = callbackQuery.data;
 
   // Ensure userData[chatId] is initialized
@@ -89,13 +88,13 @@ bot.on('callback_query', async (callbackQuery) => {
   if (userData[chatId].state === STATES.SELECTING_CHAIN) {
     userData[chatId].chain = data;
     userData[chatId].state = STATES.TYPING_TOKEN;
-    await bot.editMessageText('Send me token address.', { chat_id: chatId, message_id: messageId });
+    await bot.sendMessage(chatId, 'Send me token address.');
     logger.info(`Chain selected: ${data}`);
   } else if (userData[chatId].state === STATES.SELECTING_SLOT) {
     if (data === 'Fast-Track') {
       userData[chatId].order = data;
       userData[chatId].state = STATES.TYPING_PORTAL;
-      await bot.editMessageText('❔ Send me portal/group link.', { chat_id: chatId, message_id: messageId });
+      await bot.sendMessage(chatId, '❔ Send me portal/group link.');
       logger.info(`Order selected: ${data}`);
     } else {
       userData[chatId].slot = data;
@@ -110,7 +109,7 @@ bot.on('callback_query', async (callbackQuery) => {
           ]
         }
       };
-      await bot.editMessageText('❔ Select period:', { chat_id: chatId, message_id: messageId, reply_markup: opts.reply_markup });
+      await bot.sendMessage(chatId, '❔ Select period:', opts);
       logger.info(`Slot selected: ${data}`);
     }
   } else if (userData[chatId].state === STATES.SELECTING_PERIOD) {
@@ -149,7 +148,7 @@ Be sure to read full message before you continue, by clicking "✅ Confirm" butt
       },
       parse_mode: 'HTML'
     };
-    await bot.editMessageText(confirmationMessage, { chat_id: chatId, message_id: messageId, reply_markup: opts.reply_markup });
+    await bot.sendMessage(chatId, confirmationMessage, opts);
     logger.info(`Period selected: ${data}`);
   } else if (data === 'confirm_order') {
     const { token_address, chain, portal_link, slot, period } = userData[chatId];
@@ -175,18 +174,18 @@ Be sure to read full message before you continue, by clicking "✅ Confirm" butt
       },
       parse_mode: 'HTML'
     };
-    await bot.editMessageText(paymentInformation, { chat_id: chatId, message_id: messageId, reply_markup: opts.reply_markup });
+    await bot.sendMessage(chatId, paymentInformation, opts);
   } else if (data === 'check_payment') {
-    await bot.editMessageText('❗️ Payment Not Received.', { chat_id: chatId, message_id: messageId });
+    await bot.sendMessage(chatId, '❗️ Payment Not Received.');
     logger.info('Payment check executed: Payment Not Received.');
   } else if (data === 'cancel_and_start_over') {
-    await resetAndStart(chatId, messageId);
+    await resetAndStart(chatId);
   } else if (data === 'confirm_delete') {
     userData[chatId] = {};
     logger.info('All configuration data has been deleted.');
-    await resetAndStart(chatId, messageId);
+    await resetAndStart(chatId);
   } else if (data === 'cancel_delete') {
-    await bot.editMessageText('Deletion cancelled.', { chat_id: chatId, message_id: messageId });
+    await bot.sendMessage(chatId, 'Deletion cancelled.');
     logger.info('Deletion cancelled.');
   }
 });
@@ -214,7 +213,7 @@ bot.on('message', async (msg) => {
         ]
       }
     };
-    await bot.editMessageText('What do you want to order?', { chat_id: chatId, message_id: msg.message_id, reply_markup: opts.reply_markup });
+    await bot.sendMessage(chatId, 'What do you want to order?', opts);
     logger.info(`Token address received: ${text}`);
   } else if (userData[chatId].state === STATES.TYPING_PORTAL) {
     const telegramLinkPattern = /(https?:\/\/)?(www\.)?(t\.me|telegram\.me)\/[a-zA-Z0-9_]+/;
@@ -230,10 +229,10 @@ bot.on('message', async (msg) => {
           ]
         }
       };
-      await bot.editMessageText('ℹ Select open slot or click to see the nearest potential availability time:', { chat_id: chatId, message_id: msg.message_id, reply_markup: opts.reply_markup });
+      await bot.sendMessage(chatId, 'ℹ Select open slot or click to see the nearest potential availability time:', opts);
       logger.info(`Portal link received: ${text}`);
     } else {
-      await bot.editMessageText('❗️ Incorrect portal or group link. Please send a correct Telegram group link.', { chat_id: chatId, message_id: msg.message_id });
+      await bot.sendMessage(chatId, '❗️ Incorrect portal or group link. Please send a correct Telegram group link.');
       logger.warning('Incorrect portal or group link received');
       // Keep the state to TYPING_PORTAL so that the user can re-enter the link
     }
@@ -246,7 +245,7 @@ bot.onText(/\/delete/, async (msg) => {
 
   // Check if there is anything to delete
   if (!userData[chatId] || Object.keys(userData[chatId]).length === 0) {
-    await bot.editMessageText('✅ Nothing to delete.', { chat_id: chatId, message_id: msg.message_id });
+    await bot.sendMessage(chatId, '✅ Nothing to delete.');
     return;
   }
 
@@ -258,7 +257,7 @@ bot.onText(/\/delete/, async (msg) => {
       ]
     }
   };
-  await bot.editMessageText('Are you sure to delete all configuration data?\nDo not do this if you have paid or are about to pay for this configuration, as a new payment wallet will be generated next time!', { chat_id: chatId, message_id: msg.message_id, reply_markup: opts.reply_markup });
+  await bot.sendMessage(chatId, 'Are you sure to delete all configuration data?\nDo not do this if you have paid or are about to pay for this configuration, as a new payment wallet will be generated next time!', opts);
 });
 
 // Create Express app
