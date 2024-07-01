@@ -71,7 +71,7 @@ const resetAndStart = async (chatId) => {
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
 
-  if (userData[chatId] && userData[chatId].state) {
+  if (userData[chatId] && userData[chatId].state !== STATES.SELECTING_CHAIN) {
     await bot.sendMessage(chatId, '❗️ Firstly, you need to delete current configuration using /delete!');
   } else {
     await resetAndStart(chatId);
