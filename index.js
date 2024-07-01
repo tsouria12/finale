@@ -54,7 +54,7 @@ const STATES = {
 let userData = {};
 
 // Function to reset user data and restart the conversation
-const resetAndStart = async (chatId) => {
+const resetAndStart = async (chatId, messageId = null) => {
   userData[chatId] = { state: STATES.SELECTING_CHAIN };
   const opts = {
     reply_markup: {
@@ -65,13 +65,21 @@ const resetAndStart = async (chatId) => {
       ]
     }
   };
+  if (messageId) {
+    try {
+      await bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: messageId });
+    } catch (error) {
+      logger.error(`Error clearing keyboard: ${error.message}`);
+    }
+  }
   await bot.sendMessage(chatId, 'Select chain:', opts);
 };
 
 // Start command
-bot.onText(/\/start/, (msg) => {
+bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
-  resetAndStart(chatId);
+  const messageId = msg.message_id;
+  await resetAndStart(chatId, messageId);
   logger.info("Received /start command");
 });
 
@@ -293,4 +301,3 @@ app.listen(port, () => {
   logger.info(`Express app listening on port ${port}`);
   bot.setWebHook(`https://finale-recy.onrender.com/webhook`);
 });
-  
