@@ -184,7 +184,7 @@ Be sure to read full message before you continue, by clicking "✅ Confirm" butt
     bot.sendMessage(chatId, '❗️ Payment Not Received.');
     logger.info('Payment check executed: Payment Not Received.');
   } else if (data === 'cancel_and_start_over') {
-    userData[chatId] = { state: STATES.SELECTING_CHAIN };
+    userData[chatId] = { state: STATES.SELECTING_CHAIN, lastMessageId: messageId };
     const opts = {
       reply_markup: {
         inline_keyboard: [
@@ -197,6 +197,7 @@ Be sure to read full message before you continue, by clicking "✅ Confirm" butt
     editMessage(chatId, messageId, 'Order cancelled. Starting over.', opts);
     logger.info('Order cancelled and starting over.');
   } else if (data === 'confirm_delete') {
+    const lastMessageId = userData[chatId]?.lastMessageId || messageId;
     delete userData[chatId]; // Clear user data
     const opts = {
       reply_markup: {
@@ -207,7 +208,7 @@ Be sure to read full message before you continue, by clicking "✅ Confirm" butt
         ]
       }
     };
-    bot.sendMessage(chatId, 'All configuration data has been deleted. Select chain to start again:', opts);
+    editMessage(chatId, lastMessageId, 'All configuration data has been deleted. Select chain to start again:', opts);
     logger.info('All configuration data has been deleted.');
   } else if (data === 'cancel_delete') {
     bot.sendMessage(chatId, 'Deletion cancelled.');
@@ -296,5 +297,5 @@ app.get('/', (req, res) => {
 const port = process.env.PORT || 5000;
 app.listen(port, () => {
   logger.info(`Express app listening on port ${port}`);
-  bot.setWebHook(`https://finale-en6w.onrender.com.com/webhook`);
+  bot.setWebHook(`https://finale-en6w.onrender.com/webhook`);
 });
