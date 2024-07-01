@@ -53,23 +53,6 @@ const STATES = {
 // User data storage
 let userData = {};
 
-// Start command
-bot.onText(/\/start/, (msg) => {
-  const chatId = msg.chat.id;
-  const opts = {
-    reply_markup: {
-      inline_keyboard: [
-        [{ text: 'ETH', callback_data: 'ETH' }],
-        [{ text: 'BNB', callback_data: 'BNB' }],
-        [{ text: 'SOL', callback_data: 'SOL' }]
-      ]
-    }
-  };
-  bot.sendMessage(chatId, 'Select chain:', opts);
-  userData[chatId] = { state: STATES.SELECTING_CHAIN };
-  logger.info("Received /start command");
-});
-
 // Function to reset user data and restart the conversation
 const resetAndStart = async (chatId) => {
   userData[chatId] = { state: STATES.SELECTING_CHAIN };
@@ -85,9 +68,22 @@ const resetAndStart = async (chatId) => {
   await bot.sendMessage(chatId, 'Select chain:', opts);
 };
 
+// Start command
+bot.onText(/\/start/, (msg) => {
+  const chatId = msg.chat.id;
+  resetAndStart(chatId);
+  logger.info("Received /start command");
+});
+
+// Callback query handler
 bot.on('callback_query', async (callbackQuery) => {
   const chatId = callbackQuery.message.chat.id;
   const data = callbackQuery.data;
+
+  // Ensure userData[chatId] is initialized
+  if (!userData[chatId]) {
+    userData[chatId] = { state: STATES.SELECTING_CHAIN };
+  }
 
   if (userData[chatId].state === STATES.SELECTING_CHAIN) {
     userData[chatId].chain = data;
@@ -202,7 +198,12 @@ bot.on('message', async (msg) => {
   // Ensure the message is not from the bot itself
   if (msg.from.is_bot) return;
 
-  if (userData[chatId] && userData[chatId].state === STATES.TYPING_TOKEN) {
+  // Ensure userData[chatId] is initialized
+  if (!userData[chatId]) {
+    userData[chatId] = { state: STATES.SELECTING_CHAIN };
+  }
+
+  if (userData[chatId].state === STATES.TYPING_TOKEN) {
     userData[chatId].token_address = text;
     userData[chatId].state = STATES.SELECTING_SLOT;
     const opts = {
@@ -214,7 +215,7 @@ bot.on('message', async (msg) => {
     };
     await bot.sendMessage(chatId, 'What do you want to order?', opts);
     logger.info(`Token address received: ${text}`);
-  } else if (userData[chatId] && userData[chatId].state === STATES.TYPING_PORTAL) {
+  } else if (userData[chatId].state === STATES.TYPING_PORTAL) {
     const telegramLinkPattern = /(https?:\/\/)?(www\.)?(t\.me|telegram\.me)\/[a-zA-Z0-9_]+/;
     if (telegramLinkPattern.test(text)) {
       userData[chatId].portal_link = text;
@@ -241,6 +242,13 @@ bot.on('message', async (msg) => {
 // Delete command handler
 bot.onText(/\/delete/, async (msg) => {
   const chatId = msg.chat.id;
+
+  // Check if there is anything to delete
+  if (!userData[chatId] || Object.keys(userData[chatId]).length === 0) {
+    await bot.sendMessage(chatId, '✅ Nothing to delete.');
+    return;
+  }
+
   const opts = {
     reply_markup: {
       inline_keyboard: [
