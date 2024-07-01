@@ -196,7 +196,7 @@ Be sure to read full message before you continue, by clicking "✅ Confirm" butt
     } else if (data === 'confirm_delete') {
       userData[chatId] = {};
       logger.info('All configuration data has been deleted.');
-      await resetAndStart(chatId);
+      await bot.sendMessage(chatId, '✅ Configuration deleted. You can start again with /start.');
     } else if (data === 'cancel_delete') {
       await bot.sendMessage(chatId, 'Deletion cancelled.');
       logger.info('Deletion cancelled.');
