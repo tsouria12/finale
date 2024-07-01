@@ -296,5 +296,5 @@ app.get('/', (req, res) => {
 const port = process.env.PORT || 5000;
 app.listen(port, () => {
   logger.info(`Express app listening on port ${port}`);
-  bot.setWebHook(`https://finale-hiha.onrender.com/webhook`);
+  bot.setWebHook(`https://finale-en6w.onrender.com.com/webhook`);
 });
