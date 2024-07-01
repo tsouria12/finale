@@ -1,6 +1,8 @@
 const TelegramBot = require('node-telegram-bot-api');
 const express = require('express');
 const bodyParser = require('body-parser');
+const fs = require('fs');
+const path = require('path');
 
 // Enable logging
 const log4js = require('log4js');
@@ -14,7 +16,7 @@ const logger = log4js.getLogger('bot');
 const token = '7237610726:AAF1gwKjNF4F8XRp2IuQsGby3f7N8_TGUEA';
 
 // Create a bot
-const bot = new TelegramBot(token);
+const bot = new TelegramBot(token, { polling: true });
 
 // Prices dictionary
 const PRICES = {
@@ -51,9 +53,9 @@ const STATES = {
 // User data storage
 let userData = {};
 
-// Function to reset user data and restart the conversation
-const resetAndStart = async (chatId) => {
-  userData[chatId] = { state: STATES.SELECTING_CHAIN };
+// Start command
+bot.onText(/\/start/, (msg) => {
+  const chatId = msg.chat.id;
   const opts = {
     reply_markup: {
       inline_keyboard: [
@@ -63,73 +65,63 @@ const resetAndStart = async (chatId) => {
       ]
     }
   };
-  const sentMessage = await bot.sendMessage(chatId, 'Select chain:', opts);
-  userData[chatId].messageId = sentMessage.message_id;
-};
-
-// Start command
-bot.onText(/\/start/, async (msg) => {
-  const chatId = msg.chat.id;
-
-  if (userData[chatId] && userData[chatId].state !== STATES.SELECTING_CHAIN) {
-    await bot.sendMessage(chatId, '❗️ Firstly, you need to delete current configuration using /delete!');
-  } else {
-    await resetAndStart(chatId);
+  bot.sendMessage(chatId, 'Select chain:', opts).then((sentMessage) => {
+    userData[chatId] = { state: STATES.SELECTING_CHAIN, lastMessageId: sentMessage.message_id };
     logger.info("Received /start command");
-  }
+  });
 });
 
+// Edit message helper function
+const editMessage = (chatId, messageId, text, opts) => {
+  bot.editMessageText(text, {
+    chat_id: chatId,
+    message_id: messageId,
+    ...opts
+  }).catch(err => console.log(err));
+};
+
 // Callback query handler
-bot.on('callback_query', async (callbackQuery) => {
+bot.on('callback_query', (callbackQuery) => {
   const chatId = callbackQuery.message.chat.id;
   const messageId = callbackQuery.message.message_id;
   const data = callbackQuery.data;
 
-  // Ensure userData[chatId] is initialized
-  if (!userData[chatId]) {
-    userData[chatId] = { state: STATES.SELECTING_CHAIN };
-  }
+  if (!userData[chatId]) return;
 
-  try {
-    await bot.deleteMessage(chatId, messageId);
+  if (userData[chatId].state === STATES.SELECTING_CHAIN) {
+    userData[chatId].chain = data;
+    userData[chatId].state = STATES.TYPING_TOKEN;
+    editMessage(chatId, messageId, 'Send me token address.');
+    logger.info(`Chain selected: ${data}`);
+  } else if (userData[chatId].state === STATES.SELECTING_SLOT) {
+    if (data === 'Fast-Track') {
+      userData[chatId].order = data;
+      userData[chatId].state = STATES.TYPING_PORTAL;
+      editMessage(chatId, messageId, '❔ Send me portal/group link.');
+      logger.info(`Order selected: ${data}`);
+    } else {
+      userData[chatId].slot = data;
+      userData[chatId].state = STATES.SELECTING_PERIOD;
+      const opts = {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '3 hours', callback_data: '3 hours' },
+             { text: '6 hours | -10%', callback_data: '6 hours' }],
+            [{ text: '12 hours | -20%', callback_data: '12 hours' },
+             { text: '24 hours | -30%', callback_data: '24 hours' }]
+          ]
+        }
+      };
+      editMessage(chatId, messageId, '❔ Select period:', opts);
+      logger.info(`Slot selected: ${data}`);
+    }
+  } else if (userData[chatId].state === STATES.SELECTING_PERIOD) {
+    userData[chatId].period = data;
+    userData[chatId].state = STATES.CONFIRMING_ORDER;
+    const { chain, token_address, portal_link, slot, period } = userData[chatId];
+    const price = PRICES[slot][period];
 
-    if (userData[chatId].state === STATES.SELECTING_CHAIN) {
-      userData[chatId].chain = data;
-      userData[chatId].state = STATES.TYPING_TOKEN;
-      const sentMessage = await bot.sendMessage(chatId, 'Send me token address.');
-      userData[chatId].messageId = sentMessage.message_id;
-      logger.info(`Chain selected: ${data}`);
-    } else if (userData[chatId].state === STATES.SELECTING_SLOT) {
-      if (data === 'Fast-Track') {
-        userData[chatId].order = data;
-        userData[chatId].state = STATES.TYPING_PORTAL;
-        const sentMessage = await bot.sendMessage(chatId, '❔ Send me portal/group link.');
-        userData[chatId].messageId = sentMessage.message_id;
-        logger.info(`Order selected: ${data}`);
-      } else {
-        userData[chatId].slot = data;
-        userData[chatId].state = STATES.SELECTING_PERIOD;
-        const opts = {
-          reply_markup: {
-            inline_keyboard: [
-              [{ text: '3 hours', callback_data: '3 hours' },
-               { text: '6 hours | -10%', callback_data: '6 hours' }],
-              [{ text: '12 hours | -20%', callback_data: '12 hours' },
-               { text: '24 hours | -30%', callback_data: '24 hours' }]
-            ]
-          }
-        };
-        const sentMessage = await bot.sendMessage(chatId, '❔ Select period:', opts);
-        userData[chatId].messageId = sentMessage.message_id;
-        logger.info(`Slot selected: ${data}`);
-      }
-    } else if (userData[chatId].state === STATES.SELECTING_PERIOD) {
-      userData[chatId].period = data;
-      userData[chatId].state = STATES.CONFIRMING_ORDER;
-      const { chain, token_address, portal_link, slot, period } = userData[chatId];
-      const price = PRICES[slot][period];
-
-      const confirmationMessage = `
+    const confirmationMessage = `
 <b>Confirm your order:</b>
 
 <b>Token Address:</b> <b>${token_address}</b>
@@ -150,24 +142,23 @@ Be sure to read full message before you continue, by clicking "✅ Confirm" butt
 8. For violation of any of the above rules your token will be removed from trending list, refund is not available.
 9. Refund can be made only in case of full service disruption (stop updating trending list and your token not in the list and full stop displaying buys in the channel) more than 20 minutes straight and to the address of the wallet from which the payment was made to the address for payment, do NOT send payment from exchanges or wallets to which you do not have access because you will not be refunded, use only your personal wallet to which you will always have access.
 `;
-      const opts = {
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: '✅ Confirm', callback_data: 'confirm_order' }],
-            [{ text: '🔄 Cancel and start over', callback_data: 'cancel_and_start_over' }]
-          ]
-        },
-        parse_mode: 'HTML'
-      };
-      const sentMessage = await bot.sendMessage(chatId, confirmationMessage, opts);
-      userData[chatId].messageId = sentMessage.message_id;
-      logger.info(`Period selected: ${data}`);
-    } else if (data === 'confirm_order') {
-      const { token_address, chain, portal_link, slot, period } = userData[chatId];
-      const price = PRICES[slot][period];
-      logger.info(`Order confirmed: Token Address: ${token_address}, Chain: ${chain}, Portal: ${portal_link}, Slot: ${slot}, Period: ${period}, Price: ${price}`);
+    const opts = {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '✅ Confirm', callback_data: 'confirm_order' }],
+          [{ text: '🔄 Cancel and start over', callback_data: 'cancel_and_start_over' }]
+        ]
+      },
+      parse_mode: 'HTML'
+    };
+    editMessage(chatId, messageId, confirmationMessage, opts);
+    logger.info(`Period selected: ${data}`);
+  } else if (data === 'confirm_order') {
+    const { token_address, chain, portal_link, slot, period } = userData[chatId];
+    const price = PRICES[slot][period];
+    logger.info(`Order confirmed: Token Address: ${token_address}, Chain: ${chain}, Portal: ${portal_link}, Slot: ${slot}, Period: ${period}, Price: ${price}`);
 
-      const paymentInformation = `
+    const paymentInformation = `
 ❔ <b>Payment Information:</b>
 
 ⤵️<b> Always double-check that you have entered the correct address before sending.</b>
@@ -178,103 +169,94 @@ Be sure to read full message before you continue, by clicking "✅ Confirm" butt
 
 <b>To cancel the payment and start over, use /delete.</b>
 `;
-      const opts = {
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: 'Check payment', callback_data: 'check_payment' }]
-          ]
-        },
-        parse_mode: 'HTML'
-      };
-      const sentMessage = await bot.sendMessage(chatId, paymentInformation, opts);
-      userData[chatId].messageId = sentMessage.message_id;
-    } else if (data === 'check_payment') {
-      await bot.sendMessage(chatId, '❗️ Payment Not Received.');
-      logger.info('Payment check executed: Payment Not Received.');
-    } else if (data === 'cancel_and_start_over') {
-      await resetAndStart(chatId);
-    } else if (data === 'confirm_delete') {
-      userData[chatId] = {};
-      logger.info('All configuration data has been deleted.');
-      await bot.sendMessage(chatId, '✅ Configuration deleted. You can start again with /start.');
-    } else if (data === 'cancel_delete') {
-      await bot.sendMessage(chatId, 'Deletion cancelled.');
-      logger.info('Deletion cancelled.');
-    }
-  } catch (error) {
-    logger.error(`Error: ${error.message}`);
+    const opts = {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: 'Check payment', callback_data: 'check_payment' }]
+        ]
+      },
+      parse_mode: 'HTML'
+    };
+    editMessage(chatId, messageId, paymentInformation, opts);
+  } else if (data === 'check_payment') {
+    editMessage(chatId, messageId, '❗️ Payment Not Received.');
+    logger.info('Payment check executed: Payment Not Received.');
+  } else if (data === 'cancel_and_start_over') {
+    userData[chatId] = { state: STATES.SELECTING_CHAIN, lastMessageId: messageId };
+    const opts = {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: 'ETH', callback_data: 'ETH' }],
+          [{ text: 'BNB', callback_data: 'BNB' }],
+          [{ text: 'SOL', callback_data: 'SOL' }]
+        ]
+      }
+    };
+    editMessage(chatId, messageId, 'Order cancelled. Starting over.');
+    editMessage(chatId, messageId, 'Select chain:', opts);
+  } else if (data === 'confirm_delete') {
+    userData = {};
+    logger.info('All configuration data has been deleted.');
+    bot.sendMessage(chatId, 'All configuration data has been deleted.');
+  } else if (data === 'cancel_delete') {
+    bot.sendMessage(chatId, 'Deletion cancelled.');
+    logger.info('Deletion cancelled.');
   }
 });
 
 // Token address handler
-bot.on('message', async (msg) => {
+bot.on('message', (msg) => {
   const chatId = msg.chat.id;
-  const messageId = msg.message_id;
   const text = msg.text;
 
   // Ensure the message is not from the bot itself
   if (msg.from.is_bot) return;
 
-  // Ensure userData[chatId] is initialized
-  if (!userData[chatId]) {
-    userData[chatId] = { state: STATES.SELECTING_CHAIN };
-  }
-
-  try {
-    await bot.deleteMessage(chatId, messageId);
-
-    if (userData[chatId].state === STATES.TYPING_TOKEN) {
-      userData[chatId].token_address = text;
+  if (userData[chatId] && userData[chatId].state === STATES.TYPING_TOKEN) {
+    userData[chatId].token_address = text;
+    userData[chatId].state = STATES.SELECTING_SLOT;
+    const opts = {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: 'Trending Fast-Track', callback_data: 'Fast-Track' }]
+        ]
+      }
+    };
+    bot.sendMessage(chatId, 'What do you want to order?', opts).then((sentMessage) => {
+      userData[chatId].lastMessageId = sentMessage.message_id;
+    });
+    logger.info(`Token address received: ${text}`);
+  } else if (userData[chatId] && userData[chatId].state === STATES.TYPING_PORTAL) {
+    const telegramLinkPattern = /(https?:\/\/)?(www\.)?(t\.me|telegram\.me)\/[a-zA-Z0-9_]+/;
+    if (telegramLinkPattern.test(text)) {
+      userData[chatId].portal_link = text;
       userData[chatId].state = STATES.SELECTING_SLOT;
       const opts = {
         reply_markup: {
           inline_keyboard: [
-            [{ text: 'Trending Fast-Track', callback_data: 'Fast-Track' }]
+            [{ text: '🟢 Top 3 Guarantee', callback_data: 'Top 3 Guarantee' },
+             { text: '🔴 Top 8 Guarantee', callback_data: 'Top 8 Guarantee' }],
+            [{ text: '🟢 Any position', callback_data: 'Any position' }]
           ]
         }
       };
-      const sentMessage = await bot.sendMessage(chatId, 'What do you want to order?', opts);
-      userData[chatId].messageId = sentMessage.message_id;
-      logger.info(`Token address received: ${text}`);
-    } else if (userData[chatId].state === STATES.TYPING_PORTAL) {
-      const telegramLinkPattern = /(https?:\/\/)?(www\.)?(t\.me|telegram\.me)\/[a-zA-Z0-9_]+/;
-      if (telegramLinkPattern.test(text)) {
-        userData[chatId].portal_link = text;
-        userData[chatId].state = STATES.SELECTING_SLOT;
-        const opts = {
-          reply_markup: {
-            inline_keyboard: [
-              [{ text: '🟢 Top 3 Guarantee', callback_data: 'Top 3 Guarantee' },
-               { text: '🔴 Top 8 Guarantee', callback_data: 'Top 8 Guarantee' }],
-              [{ text: '🟢 Any position', callback_data: 'Any position' }]
-            ]
-          }
-        };
-        const sentMessage = await bot.sendMessage(chatId, 'ℹ Select open slot or click to see the nearest potential availability time:', opts);
-        userData[chatId].messageId = sentMessage.message_id;
-        logger.info(`Portal link received: ${text}`);
-      } else {
-        const sentMessage = await bot.sendMessage(chatId, '❗️ Incorrect portal or group link. Please send a correct Telegram group link.');
-        userData[chatId].messageId = sentMessage.message_id;
-        logger.warning('Incorrect portal or group link received');
-        // Keep the state to TYPING_PORTAL so that the user can re-enter the link
-      }
+      bot.sendMessage(chatId, 'ℹ Select open slot or click to see the nearest potential availability time:', opts).then((sentMessage) => {
+        userData[chatId].lastMessageId = sentMessage.message_id;
+      });
+      logger.info(`Portal link received: ${text}`);
+    } else {
+      bot.sendMessage(chatId, '❗️ Incorrect portal or group link. Please send a correct Telegram group link.').then((sentMessage) => {
+        userData[chatId].lastMessageId = sentMessage.message_id;
+      });
+      logger.warning('Incorrect portal or group link received');
+      // Keep the state to TYPING_PORTAL so that the user can re-enter the link
     }
-  } catch (error) {
-    logger.error(`Error: ${error.message}`);
   }
 });
 
 // Delete command handler
-bot.onText(/\/delete/, async (msg) => {
+bot.onText(/\/delete/, (msg) => {
   const chatId = msg.chat.id;
-
-  // Check if there is anything to delete
-  if (!userData[chatId] || Object.keys(userData[chatId]).length === 0) {
-    await bot.sendMessage(chatId, '✅ Nothing to delete.');
-    return;
-  }
-
   const opts = {
     reply_markup: {
       inline_keyboard: [
@@ -283,8 +265,7 @@ bot.onText(/\/delete/, async (msg) => {
       ]
     }
   };
-  const sentMessage = await bot.sendMessage(chatId, 'Are you sure to delete all configuration data?\nDo not do this if you have paid or are about to pay for this configuration, as a new payment wallet will be generated next time!', opts);
-  userData[chatId].messageId = sentMessage.message_id;
+  bot.sendMessage(chatId, 'Are you sure to delete all configuration data?\nDo not do this if you have paid or are about to pay for this configuration, as a new payment wallet will be generated next time!', opts);
 });
 
 // Create Express app
