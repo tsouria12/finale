@@ -179,7 +179,7 @@ Be sure to read full message before you continue, by clicking "✅ Confirm" butt
     };
     editMessage(chatId, messageId, paymentInformation, opts);
   } else if (data === 'check_payment') {
-    editMessage(chatId, messageId, '❗️ Payment Not Received.');
+bot.sendMessage(chatId, '❗️ Payment Not Received.');
     logger.info('Payment check executed: Payment Not Received.');
   } else if (data === 'cancel_and_start_over') {
     userData[chatId] = { state: STATES.SELECTING_CHAIN, lastMessageId: messageId };
