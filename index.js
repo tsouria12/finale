@@ -195,9 +195,18 @@ Be sure to read full message before you continue, by clicking "✅ Confirm" butt
     editMessage(chatId, messageId, 'Order cancelled. Starting over.');
     editMessage(chatId, messageId, 'Select chain:', opts);
   } else if (data === 'confirm_delete') {
-    userData = {};
+    delete userData[chatId];
+    const opts = {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: 'ETH', callback_data: 'ETH' }],
+          [{ text: 'BNB', callback_data: 'BNB' }],
+          [{ text: 'SOL', callback_data: 'SOL' }]
+        ]
+      }
+    };
+    editMessage(chatId, messageId, 'Select chain:', opts);
     logger.info('All configuration data has been deleted.');
-    bot.sendMessage(chatId, 'All configuration data has been deleted.');
   } else if (data === 'cancel_delete') {
     bot.sendMessage(chatId, 'Deletion cancelled.');
     logger.info('Deletion cancelled.');
