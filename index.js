@@ -54,7 +54,7 @@ const STATES = {
 let userData = {};
 
 // Function to reset user data and restart the conversation
-const resetAndStart = async (chatId, messageId = null) => {
+const resetAndStart = async (chatId) => {
   userData[chatId] = { state: STATES.SELECTING_CHAIN };
   const opts = {
     reply_markup: {
@@ -65,21 +65,33 @@ const resetAndStart = async (chatId, messageId = null) => {
       ]
     }
   };
-  if (messageId) {
-    try {
-      await bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: messageId });
-    } catch (error) {
-      logger.error(`Error clearing keyboard: ${error.message}`);
-    }
-  }
   await bot.sendMessage(chatId, 'Select chain:', opts);
 };
 
 // Start command
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
-  const messageId = msg.message_id;
-  await resetAndStart(chatId, messageId);
+  
+  // Clear previous messages if they exist
+  if (userData[chatId] && userData[chatId].messageId) {
+    try {
+      await bot.deleteMessage(chatId, userData[chatId].messageId);
+    } catch (error) {
+      logger.error(`Error deleting previous message: ${error.message}`);
+    }
+  }
+
+  const sentMessage = await bot.sendMessage(chatId, 'Select chain:', {
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: 'ETH', callback_data: 'ETH' }],
+        [{ text: 'BNB', callback_data: 'BNB' }],
+        [{ text: 'SOL', callback_data: 'SOL' }]
+      ]
+    }
+  });
+  
+  userData[chatId] = { state: STATES.SELECTING_CHAIN, messageId: sentMessage.message_id };
   logger.info("Received /start command");
 });
 
@@ -100,13 +112,15 @@ bot.on('callback_query', async (callbackQuery) => {
     if (userData[chatId].state === STATES.SELECTING_CHAIN) {
       userData[chatId].chain = data;
       userData[chatId].state = STATES.TYPING_TOKEN;
-      await bot.sendMessage(chatId, 'Send me token address.');
+      const sentMessage = await bot.sendMessage(chatId, 'Send me token address.');
+      userData[chatId].messageId = sentMessage.message_id;
       logger.info(`Chain selected: ${data}`);
     } else if (userData[chatId].state === STATES.SELECTING_SLOT) {
       if (data === 'Fast-Track') {
         userData[chatId].order = data;
         userData[chatId].state = STATES.TYPING_PORTAL;
-        await bot.sendMessage(chatId, '❔ Send me portal/group link.');
+        const sentMessage = await bot.sendMessage(chatId, '❔ Send me portal/group link.');
+        userData[chatId].messageId = sentMessage.message_id;
         logger.info(`Order selected: ${data}`);
       } else {
         userData[chatId].slot = data;
@@ -121,7 +135,8 @@ bot.on('callback_query', async (callbackQuery) => {
             ]
           }
         };
-        await bot.sendMessage(chatId, '❔ Select period:', opts);
+        const sentMessage = await bot.sendMessage(chatId, '❔ Select period:', opts);
+        userData[chatId].messageId = sentMessage.message_id;
         logger.info(`Slot selected: ${data}`);
       }
     } else if (userData[chatId].state === STATES.SELECTING_PERIOD) {
@@ -160,7 +175,8 @@ Be sure to read full message before you continue, by clicking "✅ Confirm" butt
         },
         parse_mode: 'HTML'
       };
-      await bot.sendMessage(chatId, confirmationMessage, opts);
+      const sentMessage = await bot.sendMessage(chatId, confirmationMessage, opts);
+      userData[chatId].messageId = sentMessage.message_id;
       logger.info(`Period selected: ${data}`);
     } else if (data === 'confirm_order') {
       const { token_address, chain, portal_link, slot, period } = userData[chatId];
@@ -186,7 +202,8 @@ Be sure to read full message before you continue, by clicking "✅ Confirm" butt
         },
         parse_mode: 'HTML'
       };
-      await bot.sendMessage(chatId, paymentInformation, opts);
+      const sentMessage = await bot.sendMessage(chatId, paymentInformation, opts);
+      userData[chatId].messageId = sentMessage.message_id;
     } else if (data === 'check_payment') {
       await bot.sendMessage(chatId, '❗️ Payment Not Received.');
       logger.info('Payment check executed: Payment Not Received.');
@@ -232,7 +249,8 @@ bot.on('message', async (msg) => {
           ]
         }
       };
-      await bot.sendMessage(chatId, 'What do you want to order?', opts);
+      const sentMessage = await bot.sendMessage(chatId, 'What do you want to order?', opts);
+      userData[chatId].messageId = sentMessage.message_id;
       logger.info(`Token address received: ${text}`);
     } else if (userData[chatId].state === STATES.TYPING_PORTAL) {
       const telegramLinkPattern = /(https?:\/\/)?(www\.)?(t\.me|telegram\.me)\/[a-zA-Z0-9_]+/;
@@ -248,10 +266,12 @@ bot.on('message', async (msg) => {
             ]
           }
         };
-        await bot.sendMessage(chatId, 'ℹ Select open slot or click to see the nearest potential availability time:', opts);
+        const sentMessage = await bot.sendMessage(chatId, 'ℹ Select open slot or click to see the nearest potential availability time:', opts);
+        userData[chatId].messageId = sentMessage.message_id;
         logger.info(`Portal link received: ${text}`);
       } else {
-        await bot.sendMessage(chatId, '❗️ Incorrect portal or group link. Please send a correct Telegram group link.');
+        const sentMessage = await bot.sendMessage(chatId, '❗️ Incorrect portal or group link. Please send a correct Telegram group link.');
+        userData[chatId].messageId = sentMessage.message_id;
         logger.warning('Incorrect portal or group link received');
         // Keep the state to TYPING_PORTAL so that the user can re-enter the link
       }
@@ -279,7 +299,8 @@ bot.onText(/\/delete/, async (msg) => {
       ]
     }
   };
-  await bot.sendMessage(chatId, 'Are you sure to delete all configuration data?\nDo not do this if you have paid or are about to pay for this configuration, as a new payment wallet will be generated next time!', opts);
+  const sentMessage = await bot.sendMessage(chatId, 'Are you sure to delete all configuration data?\nDo not do this if you have paid or are about to pay for this configuration, as a new payment wallet will be generated next time!', opts);
+  userData[chatId].messageId = sentMessage.message_id;
 });
 
 // Create Express app
