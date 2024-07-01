@@ -16,7 +16,7 @@ const logger = log4js.getLogger('bot');
 const token = '7415948828:AAE492BWjZunTM71LeImn6yBv66BUKxW3MU';
 
 // Create a bot
-const bot = new TelegramBot(token);
+const bot = new TelegramBot(token, { polling: true });
 
 // Prices dictionary
 const PRICES = {
@@ -195,6 +195,9 @@ Be sure to read full message before you continue, by clicking "✅ Confirm" butt
 bot.on('message', (msg) => {
   const chatId = msg.chat.id;
   const text = msg.text;
+
+  // Ensure the message is not from the bot itself
+  if (msg.from.is_bot) return;
 
   if (userData[chatId] && userData[chatId].state === STATES.TYPING_TOKEN) {
     userData[chatId].token_address = text;
