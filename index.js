@@ -13,7 +13,7 @@ log4js.configure({
 const logger = log4js.getLogger('bot');
 
 // Token
-const token = '6932215235:AAH0L50r7VKtBWYw6OFl7q0DTE_g4l-zLA0';
+const token = '7415948828:AAE492BWjZunTM71LeImn6yBv66BUKxW3MU';
 
 // Create a bot
 const bot = new TelegramBot(token);
