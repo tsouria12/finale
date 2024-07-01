@@ -225,8 +225,9 @@ bot.on('message', (msg) => {
       bot.sendMessage(chatId, 'ℹ Select open slot or click to see the nearest potential availability time:', opts);
       logger.info(`Portal link received: ${text}`);
     } else {
-      bot.sendMessage(chatId, '❗️ Incorrect portal or group link.');
+      bot.sendMessage(chatId, '❗️ Incorrect portal or group link. Please send a correct Telegram group link.');
       logger.warning('Incorrect portal or group link received');
+      // Keep the state to TYPING_PORTAL so that the user can re-enter the link
     }
   }
 });
@@ -264,4 +265,3 @@ app.listen(port, () => {
   logger.info(`Express app listening on port ${port}`);
   bot.setWebHook(`https://finale-pgba.onrender.com/webhook`);
 });
-
