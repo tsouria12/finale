@@ -16,7 +16,7 @@ const logger = log4js.getLogger('bot');
 const token = '7237610726:AAF1gwKjNF4F8XRp2IuQsGby3f7N8_TGUEA';
 
 // Create a bot
-const bot = new TelegramBot(token, { polling: true });
+const bot = new TelegramBot(token);
 
 // Prices dictionary
 const PRICES = {
