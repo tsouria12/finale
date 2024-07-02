@@ -197,7 +197,7 @@ Be sure to read full message before you continue, by clicking "✅ Confirm" butt
     editMessage(chatId, messageId, 'Order cancelled. Starting over.', opts);
     logger.info('Order cancelled and starting over.');
   } else if (data === 'confirm_delete') {
-    const lastMessageId = userData[chatId]?.lastMessageId || messageId;
+    const deleteMessageId = userData[chatId].deleteMessageId || messageId;
     delete userData[chatId]; // Clear user data
     const opts = {
       reply_markup: {
@@ -208,7 +208,7 @@ Be sure to read full message before you continue, by clicking "✅ Confirm" butt
         ]
       }
     };
-    editMessage(chatId, lastMessageId, 'Select chain:', opts);
+    editMessage(chatId, deleteMessageId, 'Select chain:', opts);
     logger.info('All configuration data has been deleted.');
   } else if (data === 'cancel_delete') {
     bot.sendMessage(chatId, 'Deletion cancelled.');
@@ -277,7 +277,12 @@ bot.onText(/\/delete/, (msg) => {
       ]
     }
   };
-  bot.sendMessage(chatId, 'Are you sure to delete all configuration data?\nDo not do this if you have paid or are about to pay for this configuration, as a new payment wallet will be generated next time!', opts);
+  bot.sendMessage(chatId, 'Are you sure to delete all configuration data?\nDo not do this if you have paid or are about to pay for this configuration, as a new payment wallet will be generated next time!', opts).then((sentMessage) => {
+    if (!userData[chatId]) {
+      userData[chatId] = {};
+    }
+    userData[chatId].deleteMessageId = sentMessage.message_id;
+  });
 });
 
 // Create Express app
