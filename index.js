@@ -15,8 +15,28 @@ const logger = log4js.getLogger('bot');
 // Token
 const token = '7288330417:AAFcIwdAAPe90LGQ918Ao5NIPEmA8LLF9kE';
 
-// Create a bot
-const bot = new TelegramBot(token, { polling: true });
+// Create a bot without polling
+const bot = new TelegramBot(token);
+
+// Create Express app
+const app = express();
+app.use(bodyParser.json());
+
+// Set webhook
+app.post('/webhook', (req, res) => {
+  bot.processUpdate(req.body);
+  res.sendStatus(200);
+});
+
+app.get('/', (req, res) => {
+  res.send('Hello World!');
+});
+
+const port = process.env.PORT || 5000;
+app.listen(port, () => {
+  logger.info(`Express app listening on port ${port}`);
+  bot.setWebHook(`https://your-domain.com/webhook`);  // Update with your domain
+});
 
 // Prices dictionary
 const PRICES = {
@@ -283,24 +303,4 @@ bot.onText(/\/delete/, (msg) => {
     }
     userData[chatId].deleteMessageId = sentMessage.message_id;
   });
-});
-
-// Create Express app
-const app = express();
-app.use(bodyParser.json());
-
-// Set webhook
-app.post('/webhook', (req, res) => {
-  bot.processUpdate(req.body);
-  res.sendStatus(200);
-});
-
-app.get('/', (req, res) => {
-  res.send('Hello World!');
-});
-
-const port = process.env.PORT || 5000;
-app.listen(port, () => {
-  logger.info(`Express app listening on port ${port}`);
-  bot.setWebHook(`https://finale-kysy.onrender.com/webhook`);
 });
