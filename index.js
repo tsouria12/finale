@@ -12,7 +12,7 @@ log4js.configure({
 });
 const logger = log4js.getLogger('bot');
 
-// Token
+// Token from environment variable
 const token = '7288330417:AAFcIwdAAPe90LGQ918Ao5NIPEmA8LLF9kE';
 
 // Create a bot without polling
@@ -24,6 +24,7 @@ app.use(bodyParser.json());
 
 // Set webhook
 app.post('/webhook', (req, res) => {
+  logger.info('Webhook request received:', req.body);
   bot.processUpdate(req.body);
   res.sendStatus(200);
 });
@@ -33,9 +34,25 @@ app.get('/', (req, res) => {
 });
 
 const port = process.env.PORT || 5000;
-app.listen(port, () => {
+app.listen(port, async () => {
   logger.info(`Express app listening on port ${port}`);
-  bot.setWebHook(`https://finale-9bri.onrender.com`);  // Update with your domain
+
+  // Set webhook and log the result
+  const webhookUrl = `https://finale-9bri.onrender.com/webhook`;  // Update with your render.com domain
+  try {
+    await bot.setWebHook(webhookUrl);
+    logger.info(`Webhook set to ${webhookUrl}`);
+  } catch (error) {
+    logger.error('Error setting webhook:', error);
+  }
+
+  // Verify webhook status
+  try {
+    const webhookInfo = await bot.getWebhookInfo();
+    logger.info('Webhook Info:', webhookInfo);
+  } catch (error) {
+    logger.error('Error getting webhook info:', error);
+  }
 });
 
 // Prices dictionary
