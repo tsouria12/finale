@@ -35,7 +35,7 @@ app.get('/', (req, res) => {
 const port = process.env.PORT || 5000;
 app.listen(port, () => {
   logger.info(`Express app listening on port ${port}`);
-  bot.setWebHook(`https://your-domain.com/webhook`);  // Update with your domain
+  bot.setWebHook(`https://finale-9bri.onrender.com`);  // Update with your domain
 });
 
 // Prices dictionary
