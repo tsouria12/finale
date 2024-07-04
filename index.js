@@ -297,7 +297,7 @@ bot.on('message', (msg) => {
       bot.sendMessage(chatId, '❗️ Incorrect portal or group link. Please send a correct Telegram group link.').then((sentMessage) => {
         userData[chatId].lastMessageId = sentMessage.message_id;
       });
-      logger.warning('Incorrect portal or group link received');
+      logger.warn('Incorrect portal or group link received');
       // Keep the state to TYPING_PORTAL so that the user can re-enter the link
     }
   }
