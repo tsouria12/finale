@@ -231,7 +231,7 @@ Be sure to read full message before you continue, by clicking "✅ Confirm" butt
         ]
       }
     };
-    editMessage(chatId, messageId, 'Order cancelled. Starting over.', opts);
+    editMessage(chatId, messageId, 'Select Chain:', opts);
     logger.info('Order cancelled and starting over.');
   } else if (data === 'confirm_delete') {
     const deleteMessageId = userData[chatId].deleteMessageId || messageId;
