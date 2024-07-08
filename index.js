@@ -341,7 +341,7 @@ bot.on('message', (msg) => {
     });
     logger.info(`Token address received: ${text}`);
   } else if (userData[chatId] && userData[chatId].state === STATES.TYPING_PORTAL) {
-    const telegramLinkPattern = /(https?:\/\/)?(www\.)?(t\.me|telegram\.me)\/[a-zA-Z0-9_]+/;
+const telegramLinkPattern = /(https?:\/\/)?(www\.)?(t\.me|telegram\.me)\/.+/;
     if (telegramLinkPattern.test(text)) {
       userData[chatId].portal_link = text;
       userData[chatId].state = STATES.SELECTING_SLOT;
