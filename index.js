@@ -349,7 +349,7 @@ const telegramLinkPattern = /(https?:\/\/)?(www\.)?(t\.me|telegram\.me)\/.+/;
         reply_markup: {
           inline_keyboard: [
             [{ text: '🟢 Top 3 Guarantee', callback_data: 'Top 3 Guarantee' },
-             { text: '🔴 Top 8 Guarantee', callback_data: 'Top 8 Guarantee' }],
+             { text: '🟢 Top 8 Guarantee', callback_data: 'Top 8 Guarantee' }],
             [{ text: '🟢 Any position', callback_data: 'Any position' }]
           ]
         }
@@ -359,7 +359,7 @@ const telegramLinkPattern = /(https?:\/\/)?(www\.)?(t\.me|telegram\.me)\/.+/;
       });
       logger.info(`Portal link received: ${text}`);
     } else {
-      bot.sendMessage(chatId, '❗️ Incorrect portal or group link. Please send a correct Telegram group link.').then((sentMessage) => {
+      bot.sendMessage(chatId, '❗️ Incorrect portal or group link.').then((sentMessage) => {
         userData[chatId].lastMessageId = sentMessage.message_id;
       });
       logger.warn('Incorrect portal or group link received');
